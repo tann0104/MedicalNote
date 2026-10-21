@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedObsidian - 医療ナレッジベース & ナビゲーター</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        medical: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                            accent: '#06b6d4',
+                        },
+                        obsidian: {
+                            bg: '#16161a',
+                            sidebar: '#1e1e24',
+                            card: '#24242e',
+                            hover: '#2f2f3d',
+                            border: '#333342',
+                            text: '#fffffe',
+                            subtext: '#94a1b2'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome & Marked.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        /* Custom scrollbar for dark UI */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e1e24;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333342;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0d9488;
+        }
+        .wiki-link {
+            color: #06b6d4;
+            background: rgba(6, 182, 212, 0.1);
+            padding: 1px 5px;
+            border-radius: 4px;
+            text-decoration: underline;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .wiki-link:hover {
+            background: rgba(6, 182, 212, 0.25);
+            color: #67e8f9;
+        }
+        /* Markdown Renderer styles */
+        .markdown-preview h1 { font-size: 1.75rem; font-weight: 700; color: #38bdf8; margin-top: 1rem; margin-bottom: 0.5rem; border-bottom: 1px solid #333342; padding-bottom: 0.25rem; }
+        .markdown-preview h2 { font-size: 1.35rem; font-weight: 600; color: #2dd4bf; margin-top: 0.85rem; margin-bottom: 0.4rem; }
+        .markdown-preview h3 { font-size: 1.1rem; font-weight: 600; color: #a5f3fc; margin-top: 0.75rem; margin-bottom: 0.3rem; }
+        .markdown-preview p { margin-bottom: 0.75rem; line-height: 1.6; }
+        .markdown-preview ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+        .markdown-preview ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+        .markdown-preview blockquote { border-left: 4px solid #0d9488; padding-left: 1rem; color: #94a1b2; font-style: italic; background: rgba(13, 148, 136, 0.05); margin: 0.5rem 0; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+        .markdown-preview code { background: #1e1e24; padding: 2px 5px; border-radius: 4px; font-family: monospace; color: #f43f5e; font-size: 0.9em; }
+        .markdown-preview table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+        .markdown-preview th, .markdown-preview td { border: 1px solid #333342; padding: 6px 12px; text-align: left; }
+        .markdown-preview th { background: #24242e; color: #2dd4bf; }
+    </style>
+</head>
+
+<body class="bg-obsidian-bg text-obsidian-text font-sans h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- Top Navigation / Status Header -->
+    <header class="h-12 bg-obsidian-sidebar border-b border-obsidian-border flex items-center justify-between px-4 shrink-0">
+        <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-notes-medical text-medical-500 text-xl"></i>
+            <span class="font-bold text-lg tracking-wide bg-gradient-to-r from-medical-500 to-cyan-400 bg-clip-text text-transparent">MedObsidian</span>
+            <span class="text-xs bg-obsidian-card text-medical-500 border border-medical-700/50 px-2 py-0.5 rounded-full font-mono">Medical Wiki v2.5</span>
+        </div>
+
+        <div class="flex items-center space-x-3 text-xs">
+            <!-- Firebase Connection Indicator -->
+            <div id="firebaseStatusBtn" onclick="openFirebaseModal()" class="flex items-center space-x-2 bg-obsidian-card hover:bg-obsidian-hover border border-obsidian-border px-3 py-1.5 rounded-lg cursor-pointer transition">
+                <span id="firebaseStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <span id="firebaseStatusText" class="text-obsidian-subtext font-medium">Local State (未接続)</span>
+                <i class="fa-solid fa-gear text-obsidian-subtext ml-1"></i>
+            </div>
+
+            <button onclick="toggleGraphModal()" class="bg-medical-700 hover:bg-medical-600 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition shadow">
+                <i class="fa-solid fa-diagram-project"></i>
+                <span class="hidden sm:inline">ナレッジグラフ</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main 3-Column Layout -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- LEFT SIDEBAR: File Tree, Search & Tag Filter -->
+        <aside id="leftSidebar" class="w-72 bg-obsidian-sidebar border-r border-obsidian-border flex flex-col shrink-0 transition-all duration-200">
+            <!-- Search & Actions -->
+            <div class="p-3 border-b border-obsidian-border space-y-2">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-obsidian-subtext text-xs"></i>
+                    <input type="text" id="searchInput" oninput="handleSearch()" placeholder="ノート検索 (Wikiリンク含む)..." 
+                           class="w-full bg-obsidian-bg text-xs rounded-md pl-8 pr-3 py-1.5 border border-obsidian-border focus:outline-none focus:border-medical-500 text-obsidian-text">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="createNewNote()" class="bg-medical-600 hover:bg-medical-500 text-white text-xs py-1.5 px-2 rounded flex items-center justify-center space-x-1 transition">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>新規ノート</span>
+                    </button>
+                    <button onclick="openTemplateMenu()" class="bg-obsidian-card hover:bg-obsidian-hover border border-obsidian-border text-xs py-1.5 px-2 rounded flex items-center justify-center space-x-1 text-medical-500 transition">
+                        <i class="fa-solid fa-file-medical"></i>
+                        <span>テンプレート</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tags Filter Bar -->
+            <div class="px-3 py-2 border-b border-obsidian-border">
+                <div class="text-[10px] font-semibold text-obsidian-subtext uppercase tracking-wider mb-1 flex justify-between items-center">
+                    <span>タグ フィルター</span>
+                    <button onclick="filterByTag(null)" class="text-medical-500 hover:underline text-[10px]">解除</button>
+                </div>
+                <div id="tagContainer" class="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                    <!-- Dynamic Tag List -->
+                </div>
+            </div>
+
+            <!-- Notes List / Tree View -->
+            <div class="flex-1 overflow-y-auto p-2">
+                <div class="text-[10px] font-semibold text-obsidian-subtext uppercase tracking-wider mb-2 px-2 flex justify-between items-center">
+                    <span>ノート一覧 (<span id="noteCount">0</span>)</span>
+                    <i class="fa-solid fa-folder text-xs"></i>
+                </div>
+                <div id="notesList" class="space-y-0.5">
+                    <!-- Dynamic Notes Items -->
+                </div>
+            </div>
+
+            <!-- Import/Export Footer -->
+            <div class="p-2 border-t border-obsidian-border bg-obsidian-card/50 flex justify-between items-center text-xs">
+                <button onclick="exportDataJSON()" class="text-obsidian-subtext hover:text-medical-500 px-2 py-1 rounded flex items-center space-x-1" title="JSONエクスポート">
+                    <i class="fa-solid fa-file-export"></i>
+                    <span>エクスポート</span>
+                </button>
+                <label class="text-obsidian-subtext hover:text-medical-500 px-2 py-1 rounded cursor-pointer flex items-center space-x-1" title="JSONインポート">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span>インポート</span>
+                    <input type="file" id="importFileInput" onchange="importDataJSON(event)" accept=".json" class="hidden">
+                </label>
+            </div>
+        </aside>
+
+        <!-- MIDDLE PANE: Note Editor & Dual View -->
+        <main class="flex-1 flex flex-col bg-obsidian-bg min-w-0">
+            <!-- Editor Control Bar -->
+            <div class="h-10 bg-obsidian-sidebar border-b border-obsidian-border flex items-center justify-between px-4">
+                <div class="flex items-center space-x-2 min-w-0">
+                    <i class="fa-solid fa-file-lines text-medical-500 text-sm"></i>
+                    <input type="text" id="noteTitleInput" oninput="handleTitleChange()" placeholder="ノートのタイトル..." 
+                           class="bg-transparent font-semibold text-sm text-obsidian-text focus:outline-none focus:bg-obsidian-card/50 rounded px-2 py-0.5 w-64 border border-transparent focus:border-obsidian-border truncate">
+                </div>
+
+                <!-- View Mode Controls -->
+                <div class="flex items-center space-x-1 bg-obsidian-bg p-0.5 rounded-lg border border-obsidian-border">
+                    <button id="btnViewEdit" onclick="setViewMode('edit')" class="px-2.5 py-1 text-xs rounded-md transition text-obsidian-subtext hover:text-white" title="編集モード">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    <button id="btnViewBoth" onclick="setViewMode('both')" class="px-2.5 py-1 text-xs rounded-md transition bg-medical-700 text-white font-medium" title="分割ビュー">
+                        <i class="fa-solid fa-columns"></i>
+                    </button>
+                    <button id="btnViewPreview" onclick="setViewMode('preview')" class="px-2.5 py-1 text-xs rounded-md transition text-obsidian-subtext hover:text-white" title="プレビューモード">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Formatting Toolbar -->
+            <div id="editorToolbar" class="px-4 py-1.5 bg-obsidian-card/40 border-b border-obsidian-border flex items-center space-x-1.5 text-xs overflow-x-auto">
+                <button onclick="insertFormat('bold')" class="p-1.5 hover:bg-obsidian-hover rounded text-obsidian-subtext hover:text-white" title="太字"><i class="fa-solid fa-bold"></i></button>
+                <button onclick="insertFormat('italic')" class="p-1.5 hover:bg-obsidian-hover rounded text-obsidian-subtext hover:text-white" title="斜体"><i class="fa-solid fa-italic"></i></button>
+                <button onclick="insertFormat('h1')" class="p-1.5 hover:bg-obsidian-hover rounded text-obsidian-subtext hover:text-white font-bold" title="見出し1">H1</button>
+                <button onclick="insertFormat('h2')" class="p-1.5 hover:bg-obsidian-hover rounded text-obsidian-subtext hover:text-white font-bold" title="見出し2">H2</button>
+                <div class="h-4 w-px bg-obsidian-border mx-1"></div>
+                <button onclick="insertFormat('ul')" class="p-1.5 hover:bg-obsidian-hover rounded text-obsidian-subtext hover:text-white" title="箇条書き"><i class="fa-solid fa-list-ul"></i></button>
+                <button onclick="insertFormat('wikilink')" class="p-1 bg-medical-900/60 hover:bg-medical-800 text-cyan-300 rounded border border-medical-700/50 px-2 flex items-center space-x-1" title="Wiki Linkを追加">
+                    <i class="fa-solid fa-link text-[10px]"></i>
+                    <span>[[Wiki Link]]</span>
+                </button>
+                <div class="h-4 w-px bg-obsidian-border mx-1"></div>
+                <button onclick="exportSingleMarkdown()" class="p-1.5 hover:bg-obsidian-hover rounded text-obsidian-subtext hover:text-white" title="Markdownとして保存 (.md)"><i class="fa-solid fa-download"></i> .md</button>
+                <button onclick="deleteCurrentNote()" class="p-1.5 hover:bg-rose-900/40 text-rose-400 hover:text-rose-300 rounded ml-auto" title="ノート削除"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+
+            <!-- Dynamic Split Panes Container -->
+            <div class="flex-1 flex overflow-hidden">
+                <!-- Editor Pane -->
+                <div id="paneEditor" class="w-1/2 h-full flex flex-col border-r border-obsidian-border">
+                    <textarea id="markdownTextarea" oninput="handleEditorInput()" placeholder="ここに医療メモをMarkdown形式で入力してください... [[他のノートタイトル]] で内部リンクを作成できます。"
+                              class="w-full h-full bg-obsidian-bg p-4 text-sm text-obsidian-text focus:outline-none font-mono resize-none leading-relaxed"></textarea>
+                </div>
+
+                <!-- Preview Pane -->
+                <div id="panePreview" class="w-1/2 h-full overflow-y-auto p-5 bg-obsidian-bg markdown-preview">
+                    <div id="previewContent" class="text-sm"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT SIDEBAR: Meta, Backlinks & Medical Calculators -->
+        <aside id="rightSidebar" class="w-80 bg-obsidian-sidebar border-l border-obsidian-border flex flex-col shrink-0 transition-all duration-200">
+            <!-- Sidebar Tabs -->
+            <div class="flex border-b border-obsidian-border bg-obsidian-card/40 text-xs font-medium">
+                <button id="tabBtnMeta" onclick="setRightTab('meta')" class="flex-1 py-2.5 border-b-2 border-medical-500 text-medical-500 flex items-center justify-center space-x-1">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>メタ & リンク</span>
+                </button>
+                <button id="tabBtnCalc" onclick="setRightTab('calc')" class="flex-1 py-2.5 border-b-2 border-transparent text-obsidian-subtext hover:text-white flex items-center justify-center space-x-1">
+                    <i class="fa-solid fa-calculator"></i>
+                    <span>臨床計算機</span>
+                </button>
+            </div>
+
+            <!-- Tab 1: Meta & Backlinks -->
+            <div id="tabContentMeta" class="flex-1 overflow-y-auto p-4 space-y-6">
+                <!-- Tags Section -->
+                <div>
+                    <label class="text-xs font-semibold text-obsidian-subtext uppercase tracking-wider block mb-2">タグ編集 (カンマ区切り)</label>
+                    <input type="text" id="noteTagsInput" onchange="handleTagsChange()" placeholder="高血圧, 循環器, ガイドライン" 
+                           class="w-full bg-obsidian-bg text-xs rounded-md px-3 py-2 border border-obsidian-border focus:outline-none focus:border-medical-500 text-obsidian-text">
+                </div>
+
+                <!-- Backlinks Section -->
+                <div class="border-t border-obsidian-border pt-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-obsidian-subtext uppercase tracking-wider">バックリンク (Mentioned In)</span>
+                        <span id="backlinkCount" class="text-[10px] bg-obsidian-card px-2 py-0.5 rounded text-medical-500 font-bold">0</span>
+                    </div>
+                    <div id="backlinksContainer" class="space-y-1.5 max-h-48 overflow-y-auto">
+                        <!-- Dynamic Backlinks -->
+                    </div>
+                </div>
+
+                <!-- Note Metadata -->
+                <div class="border-t border-obsidian-border pt-4 text-xs space-y-2 text-obsidian-subtext">
+                    <div class="flex justify-between">
+                        <span>作成日時:</span>
+                        <span id="metaCreated" class="text-obsidian-text">-</span>
+                    </div>
+                    <div flex justify-between>
+                        <span>最終更新:</span>
+                        <span id="metaUpdated" class="text-obsidian-text">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>文字数:</span>
+                        <span id="metaCharCount" class="text-obsidian-text">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Medical Calculators -->
+            <div id="tabContentCalc" class="flex-1 overflow-y-auto p-4 space-y-6 hidden">
+                
+                <!-- eGFR Calculator -->
+                <div class="bg-obsidian-card p-3 rounded-xl border border-obsidian-border space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold text-cyan-400">
+                        <span><i class="fa-solid fa-kidneys mr-1"></i> eGFR 計算機 (日本腎臓学会式)</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <label class="text-obsidian-subtext text-[10px]">性別</label>
+                            <select id="egfrGender" onchange="calcEGFR()" class="w-full bg-obsidian-bg border border-obsidian-border rounded p-1 text-xs">
+                                <option value="male">男性</option>
+                                <option value="female">女性</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-obsidian-subtext text-[10px]">年齢</label>
+                            <input type="number" id="egfrAge" value="65" oninput="calcEGFR()" class="w-full bg-obsidian-bg border border-obsidian-border rounded p-1 text-xs">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-obsidian-subtext text-[10px]">血清クレアチニン Cr (mg/dL)</label>
+                        <input type="number" step="0.01" id="egfrCr" value="1.1" oninput="calcEGFR()" class="w-full bg-obsidian-bg border border-obsidian-border rounded p-1 text-xs">
+                    </div>
+                    <div class="bg-obsidian-bg p-2 rounded border border-medical-800 text-center">
+                        <div class="text-[10px] text-obsidian-subtext">推定eGFR</div>
+                        <div id="egfrResult" class="text-lg font-bold text-medical-500">52.4 mL/min/1.73m²</div>
+                        <div id="egfrStage" class="text-[10px] font-semibold text-amber-400">G3a (軽度〜中等度低下)</div>
+                    </div>
+                </div>
+
+                <!-- BMI Calculator -->
+                <div class="bg-obsidian-card p-3 rounded-xl border border-obsidian-border space-y-2">
+                    <div class="text-xs font-bold text-teal-400"><i class="fa-solid fa-weight-scale mr-1"></i> BMI 計算機</div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <label class="text-obsidian-subtext text-[10px]">身長 (cm)</label>
+                            <input type="number" id="bmiHeight" value="170" oninput="calcBMI()" class="w-full bg-obsidian-bg border border-obsidian-border rounded p-1 text-xs">
+                        </div>
+                        <div>
+                            <label class="text-obsidian-subtext text-[10px]">体重 (kg)</label>
+                            <input type="number" id="bmiWeight" value="68" oninput="calcBMI()" class="w-full bg-obsidian-bg border border-obsidian-border rounded p-1 text-xs">
+                        </div>
+                    </div>
+                    <div class="bg-obsidian-bg p-2 rounded border border-obsidian-border text-center">
+                        <div class="text-[10px] text-obsidian-subtext">BMI スコア</div>
+                        <div id="bmiResult" class="text-lg font-bold text-teal-400">23.5</div>
+                        <div id="bmiStatus" class="text-[10px] text-emerald-400">普通体重</div>
+                    </div>
+                </div>
+
+                <!-- GCS Calculator -->
+                <div class="bg-obsidian-card p-3 rounded-xl border border-obsidian-border space-y-2">
+                    <div class="text-xs font-bold text-purple-400"><i class="fa-solid fa-brain mr-1"></i> Glasgow Coma Scale (GCS)</div>
+                    <div class="space-y-1.5 text-xs">
+                        <div>
+                            <label class="text-obsidian-subtext text-[10px]">E (開眼反応)</label>
+                            <select id="gcsE" onchange="calcGCS()" class="w-full bg-obsidian-bg border border-obsidian-border rounded p-1 text-xs">
+                                <option value="4">4: 自発的に開眼</option>
+                                <option value="3">3: 呼びかけで開眼</option>
+                                <option value="2">2: 痛み刺激で開眼</option>
+                                <option value="1">1: 開眼しない</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-obsidian-subtext text-[10px]">V (言語反応)</label>
+                            <select id="gcsV" onchange="calcGCS()" class="w-full bg-obsidian-bg border border-obsidian-border rounded p-1 text-xs">
+                                <option value="5">5: 配向性あり会話可能</option>
+                                <option value="4">4: 混乱した会話</option>
+                                <option value="3">3: 不適切な単語</option>
+                                <option value="2">2: 理解不能な発声</option>
+                                <option value="1">1: 発声なし</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-obsidian-subtext text-[10px]">M (運動反応)</label>
+                            <select id="gcsM" onchange="calcGCS()" class="w-full bg-obsidian-bg border border-obsidian-border rounded p-1 text-xs">
+                                <option value="6">6: 従命動作が可能</option>
+                                <option value="5">5: 痛みに局所反応</option>
+                                <option value="4">4: 逃避反応</option>
+                                <option value="3">3: 異常屈曲反応</option>
+                                <option value="2">2: 異常伸展反応</option>
+                                <option value="1">1: 運動なし</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="bg-obsidian-bg p-2 rounded border border-obsidian-border text-center">
+                        <div id="gcsResult" class="text-lg font-bold text-purple-400">E4V5M6 (15/15)</div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+    </div>
+
+    <!-- MODAL 1: Firebase Configuration & Setup Instructions Modal -->
+    <div id="firebaseModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-obsidian-card border border-obsidian-border rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-obsidian-border flex justify-between items-center bg-obsidian-sidebar">
+                <div class="flex items-center space-x-2 text-medical-500 font-bold">
+                    <i class="fa-solid fa-database text-lg"></i>
+                    <span>Firebase Firestore 連携設定</span>
+                </div>
+                <button onclick="closeFirebaseModal()" class="text-obsidian-subtext hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-6 text-xs leading-relaxed">
+                <!-- Status Notice -->
+                <div id="modalConnAlert" class="p-3 rounded-lg bg-amber-950/40 border border-amber-800 text-amber-300 flex items-center space-x-2">
+                    <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                    <span>現在 Firebase Config が未設定のため、ブラウザ内メモリ/Local Stateで動作しています。</span>
+                </div>
+
+                <!-- Form Credentials -->
+                <div class="space-y-3 bg-obsidian-bg p-4 rounded-lg border border-obsidian-border">
+                    <h3 class="font-bold text-sm text-obsidian-text border-b border-obsidian-border pb-1">Firebase Project Config</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-obsidian-subtext mb-1">apiKey</label>
+                            <input type="text" id="cfgApiKey" placeholder="AIzaSy..." class="w-full bg-obsidian-card p-2 rounded border border-obsidian-border text-obsidian-text focus:outline-none focus:border-medical-500 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-obsidian-subtext mb-1">authDomain</label>
+                            <input type="text" id="cfgAuthDomain" placeholder="my-app.firebaseapp.com" class="w-full bg-obsidian-card p-2 rounded border border-obsidian-border text-obsidian-text focus:outline-none focus:border-medical-500 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-obsidian-subtext mb-1">projectId</label>
+                            <input type="text" id="cfgProjectId" placeholder="my-app-id" class="w-full bg-obsidian-card p-2 rounded border border-obsidian-border text-obsidian-text focus:outline-none focus:border-medical-500 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-obsidian-subtext mb-1">storageBucket</label>
+                            <input type="text" id="cfgStorageBucket" placeholder="my-app.appspot.com" class="w-full bg-obsidian-card p-2 rounded border border-obsidian-border text-obsidian-text focus:outline-none focus:border-medical-500 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-obsidian-subtext mb-1">messagingSenderId</label>
+                            <input type="text" id="cfgMessagingSenderId" placeholder="1234567890" class="w-full bg-obsidian-card p-2 rounded border border-obsidian-border text-obsidian-text focus:outline-none focus:border-medical-500 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-obsidian-subtext mb-1">appId</label>
+                            <input type="text" id="cfgAppId" placeholder="1:1234567890:web:..." class="w-full bg-obsidian-card p-2 rounded border border-obsidian-border text-obsidian-text focus:outline-none focus:border-medical-500 font-mono">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Guide Steps -->
+                <div class="space-y-2">
+                    <h3 class="font-bold text-sm text-medical-500">Firebase Firestore セッティング方法:</h3>
+                    <ol class="list-decimal pl-5 space-y-1.5 text-obsidian-subtext">
+                        <li><a href="https://console.firebase.google.com/" target="_blank" class="text-cyan-400 hover:underline">Firebase Console</a> にログインし、プロジェクトを作成します。</li>
+                        <li>「ウェブアプリを追加」を選択し、表示された `firebaseConfig` オブジェクトの値を上記に入力します。</li>
+                        <li>Firestore Database を作成（「テストモード」で開始可能）します。</li>
+                        <li>Firebase Rules を以下のように設定してください:</li>
+                    </ol>
+                    <pre class="bg-obsidian-bg p-3 rounded text-[11px] font-mono text-emerald-400 border border-obsidian-border overflow-x-auto">
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-obsidian-border bg-obsidian-sidebar flex justify-between items-center">
+                <button onclick="clearFirebaseCredentials()" class="text-rose-400 hover:text-rose-300 font-medium">設定をクリア</button>
+                <div class="space-x-2">
+                    <button onclick="closeFirebaseModal()" class="px-4 py-2 rounded bg-obsidian-hover hover:bg-obsidian-border text-white transition">キャンセル</button>
+                    <button onclick="saveFirebaseCredentials()" class="px-4 py-2 rounded bg-medical-600 hover:bg-medical-500 text-white font-medium transition shadow">保存して再接続</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Interactive 2D Knowledge Graph Modal -->
+    <div id="graphModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-6">
+        <div class="bg-obsidian-card border border-obsidian-border rounded-xl w-full h-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl relative">
+            <div class="px-6 py-3 border-b border-obsidian-border flex justify-between items-center bg-obsidian-sidebar">
+                <div class="flex items-center space-x-2 text-cyan-400 font-bold">
+                    <i class="fa-solid fa-circle-nodes text-lg"></i>
+                    <span>ナレッジグラフ ビジュアルビュー (2D Link Map)</span>
+                </div>
+                <button onclick="toggleGraphModal()" class="text-obsidian-subtext hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div class="flex-1 relative bg-obsidian-bg overflow-hidden">
+                <canvas id="graphCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+                <div class="absolute bottom-3 left-3 bg-obsidian-card/80 border border-obsidian-border p-2 rounded text-[11px] text-obsidian-subtext backdrop-blur-sm space-y-1">
+                    <div>• ノードをドラッグして移動</div>
+                    <div>• クリックでそのノートにジャンプ</div>
+                    <div>• 線は `[[Wiki Link]]` の接続関係を示します</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Medical Templates Picker Modal -->
+    <div id="templateModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-obsidian-card border border-obsidian-border rounded-xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div class="px-5 py-3 border-b border-obsidian-border flex justify-between items-center bg-obsidian-sidebar">
+                <span class="font-bold text-sm text-medical-500"><i class="fa-solid fa-file-medical mr-2"></i>医療テンプレートを選択</span>
+                <button onclick="closeTemplateMenu()" class="text-obsidian-subtext hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 grid grid-cols-1 gap-2.5">
+                <button onclick="applyTemplate('soap')" class="p-3 bg-obsidian-bg hover:bg-obsidian-hover border border-obsidian-border rounded-lg text-left transition space-y-1">
+                    <div class="font-bold text-xs text-cyan-400">SOAP カルテ テンプレート</div>
+                    <div class="text-[11px] text-obsidian-subtext">Subjective, Objective, Assessment, Plan の標準臨床記述フォーマット</div>
+                </button>
+                <button onclick="applyTemplate('case')" class="p-3 bg-obsidian-bg hover:bg-obsidian-hover border border-obsidian-border rounded-lg text-left transition space-y-1">
+                    <div class="font-bold text-xs text-teal-400">症例報告 (Case Report) テンプレート</div>
+                    <div class="text-[11px] text-obsidian-subtext">患者背景、主訴、現病歴、検査所見、治療経過および考察のまとめ</div>
+                </button>
+                <button onclick="applyTemplate('drug')" class="p-3 bg-obsidian-bg hover:bg-obsidian-hover border border-obsidian-border rounded-lg text-left transition space-y-1">
+                    <div class="font-bold text-xs text-purple-400">医薬品プロファイル (Drug Index) テンプレート</div>
+                    <div class="text-[11px] text-obsidian-subtext">薬効分類、適応症、用法用量、禁忌・副作用、相互作用の整理ノート</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE SDKs (Modular ESM) -->
+    <script type="module">
+        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global State & Data Models
+        window.db = null;
+        window.isFirebaseActive = false;
+
+        // Sample Pre-populated Notes (In-Memory Fallback & Initial Seed)
+        const SAMPLE_NOTES = [
+            {
+                id: "note_hypertension_guideline",
+                title: "高血圧治療ガイドライン",
+                content: "# 高血圧治療ガイドライン (JSH2019 要約)\n\n高血圧症の管理基準と治療指針のまとめ。\n\n## 降圧目標値\n- **75歳未満の成人**: 130/80 mmHg 未満\n- **75歳以上の高齢者**: 140/90 mmHg 未満\n- **[[eGFR/CKD分類]] 患者**: 130/80 mmHg 未満 (蛋白尿陽性時)\n\n## 第一選択薬\n1. **ACE阻害薬 / ARB**\n2. **Ca拮抗薬** (例: アムロジピン)\n3. **サイアザイド系利尿薬**\n\n詳細なカルテ記載については [[SOAPカルテテンプレート]] を参照。",
+                tags: ["循環器", "高血圧", "ガイドライン"],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            },
+            {
+                id: "note_egfr_ckd",
+                title: "eGFR/CKD分類",
+                content: "# 慢性腎臓病 (CKD) と eGFR 評価\n\n腎機能低下の評価指針ノート。\n\n## CKD重症度分類 (eGFR)\n- **G1**: 90以上 (正常)\n- **G2**: 60〜89 (軽度低下)\n- **G3a**: 45〜59 (軽度〜中等度低下)\n- **G3b**: 30〜44 (中等度〜重度低下)\n- **G4**: 15〜29 (重度低下)\n- **G5**: 15未満 (末期腎不全)\n\n> 右サイドバーの「臨床計算機」タブから日本腎臓学会推算式に基づくeGFR計算が可能です。\n\n関連ノート: [[高血圧治療ガイドライン]]",
+                tags: ["腎臓内科", "CKD", "検査"],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            },
+            {
+                id: "note_soap_template",
+                title: "SOAPカルテテンプレート",
+                content: "# SOAP カルテ記述ルール\n\n## S (Subjective) - 主訴・医療面接\n- 患者の訴え、症状の経過\n\n## O (Objective) - 他覚的所見\n- バイタルサイン、身体所見\n- 採血データ (eGFR, Cr, HbA1cなど)\n\n## A (Assessment) - 評価・診断\n- 病態生理学的考察\n- 鑑別診断\n\n## P (Plan) - 治療・検査計画\n- 処方薬剤の変更計画\n- 次回検査予定\n\n臨床例は [[高血圧治療ガイドライン]] を基本姿勢とする。",
+                tags: ["テンプレート", "カルテ", "基本方針"],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            }
+        ];
+
+        window.notes = [];
+        window.currentNoteId = null;
+        window.activeTagFilter = null;
+        window.searchQuery = "";
+        window.viewMode = "both"; // 'edit', 'preview', 'both'
+
+        // Initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFirebaseConfig();
+            initCalculators();
+            renderAll();
+        });
+
+        // ----------------------------------------------------
+        // FIREBASE INTEGRATION & FALLBACK LOGIC
+        // ----------------------------------------------------
+        window.loadFirebaseConfig = function() {
+            const savedCfg = localStorage.getItem('med_obsidian_firebase_cfg');
+            if (savedCfg) {
+                try {
+                    const config = JSON.parse(savedCfg);
+                    if (config.apiKey && config.projectId) {
+                        initFirebase(config);
+                        return;
+                    }
+                } catch(e) {
+                    console.error("Config parse error", e);
+                }
+            }
+            // Fallback Mode
+            setupFallbackLocalState();
+        };
+
+        function initFirebase(config) {
+            try {
+                let app;
+                if (!getApps().length) {
+                    app = initializeApp(config);
+                } else {
+                    app = getApps()[0];
+                }
+                window.db = getFirestore(app);
+                window.isFirebaseActive = true;
+                
+                updateStatusIndicator(true, "Firebase 接続中");
+                
+                // Real-time Firestore Sync
+                const notesCol = collection(window.db, "notes");
+                onSnapshot(notesCol, (snapshot) => {
+                    const loadedNotes = [];
+                    snapshot.forEach(docSnap => {
+                        loadedNotes.push({ id: docSnap.id, ...docSnap.data() });
+                    });
+                    
+                    if (loadedNotes.length === 0) {
+                        // Seed Firestore if empty
+                        seedFirestoreData(notesCol);
+                    } else {
+                        window.notes = loadedNotes;
+                        if (!window.currentNoteId && window.notes.length > 0) {
+                            window.currentNoteId = window.notes[0].id;
+                        }
+                        renderAll();
+                    }
+                }, (err) => {
+                    console.error("Firestore sync error:", err);
+                    updateStatusIndicator(false, "Firebase 接続エラー");
+                    setupFallbackLocalState();
+                });
+
+            } catch(e) {
+                console.error("Firebase init failed:", e);
+                setupFallbackLocalState();
+            }
+        }
+
+        async function seedFirestoreData(notesCol) {
+            for (const note of SAMPLE_NOTES) {
+                await setDoc(doc(notesCol, note.id), note);
+            }
+        }
+
+        function setupFallbackLocalState() {
+            window.isFirebaseActive = false;
+            updateStatusIndicator(false, "Local State (未接続)");
+            
+            const localData = localStorage.getItem('med_obsidian_local_notes');
+            if (localData) {
+                try {
+                    window.notes = JSON.parse(localData);
+                } catch(e) {
+                    window.notes = SAMPLE_NOTES;
+                }
+            } else {
+                window.notes = SAMPLE_NOTES;
+                saveLocalNotes();
+            }
+
+            if (!window.currentNoteId && window.notes.length > 0) {
+                window.currentNoteId = window.notes[0].id;
+            }
+            renderAll();
+        }
+
+        window.saveCurrentNoteState = async function() {
+            const currentNote = window.notes.find(n => n.id === window.currentNoteId);
+            if (!currentNote) return;
+
+            currentNote.updatedAt = new Date().toISOString();
+
+            if (window.isFirebaseActive && window.db) {
+                try {
+                    await setDoc(doc(window.db, "notes", currentNote.id), currentNote);
+                } catch(e) {
+                    console.error("Failed to save to Firestore:", e);
+                }
+            } else {
+                saveLocalNotes();
+            }
+        };
+
+        function saveLocalNotes() {
+            localStorage.setItem('med_obsidian_local_notes', JSON.stringify(window.notes));
+        }
+
+        function updateStatusIndicator(connected, text) {
+            const dot = document.getElementById('firebaseStatusDot');
+            const txt = document.getElementById('firebaseStatusText');
+            if (!dot || !txt) return;
+
+            if (connected) {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500";
+                txt.innerText = text;
+                txt.className = "text-emerald-400 font-medium";
+            } else {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+                txt.innerText = text;
+                txt.className = "text-obsidian-subtext font-medium";
+            }
+        }
+
+        window.saveFirebaseCredentials = function() {
+            const cfg = {
+                apiKey: document.getElementById('cfgApiKey').value.trim(),
+                authDomain: document.getElementById('cfgAuthDomain').value.trim(),
+                projectId: document.getElementById('cfgProjectId').value.trim(),
+                storageBucket: document.getElementById('cfgStorageBucket').value.trim(),
+                messagingSenderId: document.getElementById('cfgMessagingSenderId').value.trim(),
+                appId: document.getElementById('cfgAppId').value.trim(),
+            };
+
+            if (!cfg.apiKey || !cfg.projectId) {
+                alert("apiKey と projectId は必須です。");
+                return;
+            }
+
+            localStorage.setItem('med_obsidian_firebase_cfg', JSON.stringify(cfg));
+            closeFirebaseModal();
+            location.reload();
+        };
+
+        window.clearFirebaseCredentials = function() {
+            localStorage.removeItem('med_obsidian_firebase_cfg');
+            closeFirebaseModal();
+            location.reload();
+        };
+
+        // ----------------------------------------------------
+        // UI RENDERERS & WIKI LINK LOGIC
+        // ----------------------------------------------------
+        window.renderAll = function() {
+            renderNotesList();
+            renderTagsList();
+            renderCurrentNote();
+            renderBacklinks();
+        };
+
+        window.renderNotesList = function() {
+            const listEl = document.getElementById('notesList');
+            if (!listEl) return;
+
+            let filtered = window.notes.filter(n => {
+                const matchesSearch = n.title.toLowerCase().includes(window.searchQuery.toLowerCase()) || 
+                                      n.content.toLowerCase().includes(window.searchQuery.toLowerCase());
+                const matchesTag = !window.activeTagFilter || (n.tags && n.tags.includes(window.activeTagFilter));
+                return matchesSearch && matchesTag;
+            });
+
+            document.getElementById('noteCount').innerText = filtered.length;
+
+            listEl.innerHTML = filtered.map(note => {
+                const isActive = note.id === window.currentNoteId;
+                return `
+                    <div onclick="selectNote('${note.id}')" 
+                         class="p-2 rounded-lg cursor-pointer transition flex items-center justify-between group ${
+                             isActive ? 'bg-medical-900/50 border border-medical-700/60 text-white font-medium' : 'hover:bg-obsidian-card text-obsidian-subtext hover:text-white'
+                         }">
+                        <div class="flex items-center space-x-2 truncate">
+                            <i class="fa-regular fa-file-lines ${isActive ? 'text-medical-500' : 'text-obsidian-subtext'}"></i>
+                            <span class="text-xs truncate">${escapeHtml(note.title || '無題のノート')}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.renderTagsList = function() {
+            const container = document.getElementById('tagContainer');
+            if (!container) return;
+
+            const tagCounts = {};
+            window.notes.forEach(n => {
+                if (Array.isArray(n.tags)) {
+                    n.tags.forEach(t => {
+                        const trimmed = t.trim();
+                        if (trimmed) tagCounts[trimmed] = (tagCounts[trimmed] || 0) + 1;
+                    });
+                }
+            });
+
+            const tags = Object.keys(tagCounts);
+            if (tags.length === 0) {
+                container.innerHTML = `<span class="text-[10px] text-obsidian-subtext">タグなし</span>`;
+                return;
+            }
+
+            container.innerHTML = tags.map(tag => {
+                const isSelected = window.activeTagFilter === tag;
+                return `
+                    <button onclick="filterByTag('${tag}')" class="text-[10px] px-2 py-0.5 rounded-full border transition ${
+                        isSelected ? 'bg-medical-600 text-white border-medical-500' : 'bg-obsidian-card border-obsidian-border text-obsidian-subtext hover:text-white'
+                    }">
+                        #${escapeHtml(tag)} <span class="opacity-60">(${tagCounts[tag]})</span>
+                    </button>
+                `;
+            }).join('');
+        };
+
+        window.renderCurrentNote = function() {
+            const note = window.notes.find(n => n.id === window.currentNoteId);
+            const titleInput = document.getElementById('noteTitleInput');
+            const textarea = document.getElementById('markdownTextarea');
+            const tagsInput = document.getElementById('noteTagsInput');
+
+            if (!note) {
+                if (titleInput) titleInput.value = "";
+                if (textarea) textarea.value = "";
+                if (tagsInput) tagsInput.value = "";
+                document.getElementById('previewContent').innerHTML = "<p class='text-obsidian-subtext italic'>ノートが選択されていないか削除されました。</p>";
+                return;
+            }
+
+            if (titleInput && titleInput !== document.activeElement) titleInput.value = note.title;
+            if (textarea && textarea !== document.activeElement) textarea.value = note.content;
+            if (tagsInput && tagsInput !== document.activeElement) tagsInput.value = (note.tags || []).join(', ');
+
+            // Update Metadata
+            document.getElementById('metaCreated').innerText = formatDate(note.createdAt);
+            document.getElementById('metaUpdated').innerText = formatDate(note.updatedAt);
+            document.getElementById('metaCharCount').innerText = (note.content || '').length;
+
+            // Render Markdown + Wiki Links parsing
+            renderMarkdownPreview(note.content || '');
+        };
+
+        function renderMarkdownPreview(rawMarkdown) {
+            const previewEl = document.getElementById('previewContent');
+            if (!previewEl) return;
+
+            // Pre-process Wiki Links [[Note Title]] -> <span class="wiki-link" onclick="openOrCreateNote('Note Title')">Note Title</span>
+            const wikiLinkRegex = /\[\[(.*?)\]\]/g;
+            const processedMarkdown = rawMarkdown.replace(wikiLinkRegex, (match, p1) => {
+                const targetTitle = p1.trim();
+                return `<span class="wiki-link" onclick="openOrCreateNote('${escapeHtml(targetTitle)}')"><i class="fa-solid fa-link text-[10px] mr-1"></i>${escapeHtml(targetTitle)}</span>`;
+            });
+
+            // Convert via Marked.js
+            previewEl.innerHTML = marked.parse(processedMarkdown);
+        }
+
+        window.renderBacklinks = function() {
+            const currentNote = window.notes.find(n => n.id === window.currentNoteId);
+            const container = document.getElementById('backlinksContainer');
+            const countBadge = document.getElementById('backlinkCount');
+            if (!container || !currentNote) return;
+
+            const backlinks = [];
+            const linkPattern = `[[${currentNote.title}]]`;
+
+            window.notes.forEach(n => {
+                if (n.id !== currentNote.id && n.content && n.content.includes(linkPattern)) {
+                    backlinks.push(n);
+                }
+            });
+
+            countBadge.innerText = backlinks.length;
+
+            if (backlinks.length === 0) {
+                container.innerHTML = `<div class="text-[11px] text-obsidian-subtext italic">このノートを参照している他のノートはありません。</div>`;
+                return;
+            }
+
+            container.innerHTML = backlinks.map(b => `
+                <div onclick="selectNote('${b.id}')" class="p-2 bg-obsidian-bg hover:bg-obsidian-card border border-obsidian-border rounded cursor-pointer transition">
+                    <div class="text-xs font-semibold text-cyan-400 flex items-center space-x-1">
+                        <i class="fa-solid fa-arrow-right-to-bracket text-[10px]"></i>
+                        <span>${escapeHtml(b.title)}</span>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        // ----------------------------------------------------
+        // NOTE ACTIONS & INTERACTION HANDLERS
+        // ----------------------------------------------------
+        window.selectNote = function(id) {
+            window.currentNoteId = id;
+            renderAll();
+        };
+
+        window.createNewNote = async function(title = "無題のノート", initialContent = "") {
+            const newNote = {
+                id: "note_" + Date.now(),
+                title: title,
+                content: initialContent || `# ${title}\n\n`,
+                tags: ["医療情報"],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            window.notes.unshift(newNote);
+            window.currentNoteId = newNote.id;
+
+            if (window.isFirebaseActive && window.db) {
+                await setDoc(doc(window.db, "notes", newNote.id), newNote);
+            } else {
+                saveLocalNotes();
+            }
+
+            renderAll();
+        };
+
+        window.openOrCreateNote = function(title) {
+            const existing = window.notes.find(n => n.title.toLowerCase() === title.toLowerCase());
+            if (existing) {
+                selectNote(existing.id);
+            } else {
+                createNewNote(title, `# ${title}\n\n自動作成されたリンクノートです。`);
+            }
+        };
+
+        window.handleTitleChange = function() {
+            const titleInput = document.getElementById('noteTitleInput');
+            const currentNote = window.notes.find(n => n.id === window.currentNoteId);
+            if (!currentNote || !titleInput) return;
+
+            currentNote.title = titleInput.value;
+            saveCurrentNoteState();
+            renderNotesList();
+            renderBacklinks();
+        };
+
+        window.handleEditorInput = function() {
+            const textarea = document.getElementById('markdownTextarea');
+            const currentNote = window.notes.find(n => n.id === window.currentNoteId);
+            if (!currentNote || !textarea) return;
+
+            currentNote.content = textarea.value;
+            renderMarkdownPreview(currentNote.content);
+            document.getElementById('metaCharCount').innerText = currentNote.content.length;
+            saveCurrentNoteState();
+            renderBacklinks();
+        };
+
+        window.handleTagsChange = function() {
+            const tagsInput = document.getElementById('noteTagsInput');
+            const currentNote = window.notes.find(n => n.id === window.currentNoteId);
+            if (!currentNote || !tagsInput) return;
+
+            const tagsArray = tagsInput.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
+            currentNote.tags = tagsArray;
+            saveCurrentNoteState();
+            renderTagsList();
+        };
+
+        window.deleteCurrentNote = async function() {
+            if (!window.currentNoteId) return;
+            if (!confirm("本当にこのノートを削除しますか？")) return;
+
+            const targetId = window.currentNoteId;
+            window.notes = window.notes.filter(n => n.id !== targetId);
+            window.currentNoteId = window.notes.length > 0 ? window.notes[0].id : null;
+
+            if (window.isFirebaseActive && window.db) {
+                await deleteDoc(doc(window.db, "notes", targetId));
+            } else {
+                saveLocalNotes();
+            }
+
+            renderAll();
+        };
+
+        window.handleSearch = function() {
+            window.searchQuery = document.getElementById('searchInput').value;
+            renderNotesList();
+        };
+
+        window.filterByTag = function(tag) {
+            window.activeTagFilter = tag;
+            renderTagsList();
+            renderNotesList();
+        };
+
+        // ----------------------------------------------------
+        // FORMATTING & TEMPLATES
+        // ----------------------------------------------------
+        window.insertFormat = function(type) {
+            const textarea = document.getElementById('markdownTextarea');
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            let replacement = "";
+
+            switch (type) {
+                case 'bold': replacement = `**${selectedText || '太字'}**`; break;
+                case 'italic': replacement = `*${selectedText || '斜体'}*`; break;
+                case 'h1': replacement = `# ${selectedText || '見出し1'}`; break;
+                case 'h2': replacement = `## ${selectedText || '見出し2'}`; break;
+                case 'ul': replacement = `- ${selectedText || 'リスト項目'}`; break;
+                case 'wikilink': replacement = `[[${selectedText || 'ノートタイトル'}]]`; break;
+            }
+
+            textarea.setRangeText(replacement, start, end, 'select');
+            handleEditorInput();
+        };
+
+        window.openTemplateMenu = function() { document.getElementById('templateModal').classList.remove('hidden'); };
+        window.closeTemplateMenu = function() { document.getElementById('templateModal').classList.add('hidden'); };
+
+        window.applyTemplate = function(type) {
+            closeTemplateMenu();
+            let title = "";
+            let content = "";
+
+            if (type === 'soap') {
+                title = "SOAP 診療記録ノート";
+                content = `# SOAP カルテ記録\n\n## S (Subjective: 主訴)\n- \n\n## O (Objective: 客観的所見)\n- バイタル: BP  /  mmHg, HR  /min\n- 検査: \n\n## A (Assessment: 評価)\n- \n\n## P (Plan: 計画)\n- 処方: \n- 次回予定: `;
+            } else if (type === 'case') {
+                title = "新症例レポート";
+                content = `# 症例報告: [疾患名/病態]\n\n## 患者情報\n- 年齢/性別: \n- 主訴: \n\n## 既往歴・服薬歴\n- [[高血圧治療ガイドライン]] など参照\n\n## 経過・治療体系\n1. 入院時所見\n2. 治療反応性\n\n## 考察`;
+            } else if (type === 'drug') {
+                title = "新薬剤プロファイル";
+                content = `# 薬剤インデックス: [一般名 / 商品名]\n\n## 薬効分類\n- \n\n## 適応・用法用量\n- \n\n## 腎機能投与量調整 (eGFR参照)\n- [[eGFR/CKD分類]] 基準\n\n## 副作用・相互作用\n- `;
+            }
+
+            createNewNote(title, content);
+        };
+
+        // View Mode Toggles
+        window.setViewMode = function(mode) {
+            window.viewMode = mode;
+            const paneEdit = document.getElementById('paneEditor');
+            const panePrev = document.getElementById('panePreview');
+
+            document.getElementById('btnViewEdit').className = `px-2.5 py-1 text-xs rounded-md transition ${mode==='edit'?'bg-medical-700 text-white font-medium':'text-obsidian-subtext hover:text-white'}`;
+            document.getElementById('btnViewBoth').className = `px-2.5 py-1 text-xs rounded-md transition ${mode==='both'?'bg-medical-700 text-white font-medium':'text-obsidian-subtext hover:text-white'}`;
+            document.getElementById('btnViewPreview').className = `px-2.5 py-1 text-xs rounded-md transition ${mode==='preview'?'bg-medical-700 text-white font-medium':'text-obsidian-subtext hover:text-white'}`;
+
+            if (mode === 'edit') {
+                paneEdit.classList.remove('hidden'); paneEdit.className = "w-full h-full flex flex-col";
+                panePrev.classList.add('hidden');
+            } else if (mode === 'preview') {
+                paneEdit.classList.add('hidden');
+                panePrev.classList.remove('hidden'); panePrev.className = "w-full h-full overflow-y-auto p-5 bg-obsidian-bg markdown-preview";
+            } else {
+                paneEdit.classList.remove('hidden'); paneEdit.className = "w-1/2 h-full flex flex-col border-r border-obsidian-border";
+                panePrev.classList.remove('hidden'); panePrev.className = "w-1/2 h-full overflow-y-auto p-5 bg-obsidian-bg markdown-preview";
+            }
+        };
+
+        window.setRightTab = function(tab) {
+            const metaTab = document.getElementById('tabContentMeta');
+            const calcTab = document.getElementById('tabContentCalc');
+            const btnMeta = document.getElementById('tabBtnMeta');
+            const btnCalc = document.getElementById('tabBtnCalc');
+
+            if (tab === 'meta') {
+                metaTab.classList.remove('hidden');
+                calcTab.classList.add('hidden');
+                btnMeta.className = "flex-1 py-2.5 border-b-2 border-medical-500 text-medical-500 flex items-center justify-center space-x-1 font-semibold";
+                btnCalc.className = "flex-1 py-2.5 border-b-2 border-transparent text-obsidian-subtext hover:text-white flex items-center justify-center space-x-1";
+            } else {
+                metaTab.classList.add('hidden');
+                calcTab.classList.remove('hidden');
+                btnCalc.className = "flex-1 py-2.5 border-b-2 border-medical-500 text-medical-500 flex items-center justify-center space-x-1 font-semibold";
+                btnMeta.className = "flex-1 py-2.5 border-b-2 border-transparent text-obsidian-subtext hover:text-white flex items-center justify-center space-x-1";
+            }
+        };
+
+        // ----------------------------------------------------
+        // MEDICAL CALCULATORS
+        // ----------------------------------------------------
+        function initCalculators() {
+            window.calcEGFR();
+            window.calcBMI();
+            window.calcGCS();
+        }
+
+        window.calcEGFR = function() {
+            const gender = document.getElementById('egfrGender').value;
+            const age = parseFloat(document.getElementById('egfrAge').value) || 0;
+            const cr = parseFloat(document.getElementById('egfrCr').value) || 0;
+
+            if (age <= 0 || cr <= 0) return;
+
+            // Japanese GFR Estimation Equation
+            let egfr = 194 * Math.pow(cr, -1.094) * Math.pow(age, -0.287);
+            if (gender === 'female') egfr *= 0.739;
+
+            const resEl = document.getElementById('egfrResult');
+            const stgEl = document.getElementById('egfrStage');
+            
+            resEl.innerText = `${egfr.toFixed(1)} mL/min/1.73m²`;
+
+            if (egfr >= 90) { stgEl.innerText = "G1 (正常)"; stgEl.className = "text-[10px] font-semibold text-emerald-400"; }
+            else if (egfr >= 60) { stgEl.innerText = "G2 (軽度低下)"; stgEl.className = "text-[10px] font-semibold text-teal-400"; }
+            else if (egfr >= 45) { stgEl.innerText = "G3a (軽度〜中等度低下)"; stgEl.className = "text-[10px] font-semibold text-amber-400"; }
+            else if (egfr >= 30) { stgEl.innerText = "G3b (中等度〜重度低下)"; stgEl.className = "text-[10px] font-semibold text-orange-400"; }
+            else if (egfr >= 15) { stgEl.innerText = "G4 (重度低下)"; stgEl.className = "text-[10px] font-semibold text-rose-400"; }
+            else { stgEl.innerText = "G5 (末期腎不全)"; stgEl.className = "text-[10px] font-semibold text-rose-600 animate-pulse"; }
+        };
+
+        window.calcBMI = function() {
+            const h = (parseFloat(document.getElementById('bmiHeight').value) || 0) / 100;
+            const w = parseFloat(document.getElementById('bmiWeight').value) || 0;
+
+            if (h <= 0 || w <= 0) return;
+            const bmi = w / (h * h);
+
+            document.getElementById('bmiResult').innerText = bmi.toFixed(1);
+            const statusEl = document.getElementById('bmiStatus');
+
+            if (bmi < 18.5) { statusEl.innerText = "低体重 (痩せ型)"; statusEl.className = "text-[10px] text-cyan-400"; }
+            else if (bmi < 25) { statusEl.innerText = "普通体重"; statusEl.className = "text-[10px] text-emerald-400"; }
+            else if (bmi < 30) { statusEl.innerText = "肥満 (1度)"; statusEl.className = "text-[10px] text-amber-400"; }
+            else { statusEl.innerText = "高度肥満 (2度以上)"; statusEl.className = "text-[10px] text-rose-400"; }
+        };
+
+        window.calcGCS = function() {
+            const e = parseInt(document.getElementById('gcsE').value);
+            const v = parseInt(document.getElementById('gcsV').value);
+            const m = parseInt(document.getElementById('gcsM').value);
+            const total = e + v + m;
+
+            document.getElementById('gcsResult').innerText = `E${e}V${v}M${m} (${total}/15点)`;
+        };
+
+        // ----------------------------------------------------
+        // DATA EXPORT / IMPORT
+        // ----------------------------------------------------
+        window.exportSingleMarkdown = function() {
+            const note = window.notes.find(n => n.id === window.currentNoteId);
+            if (!note) return;
+
+            const blob = new Blob([note.content], { type: 'text/markdown;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `${note.title || 'note'}.md`;
+            link.click();
+        };
+
+        window.exportDataJSON = function() {
+            const dataStr = JSON.stringify(window.notes, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `MedObsidian_Backup_${new Date().toISOString().slice(0,10)}.json`;
+            link.click();
+        };
+
+        window.importDataJSON = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        window.notes = imported;
+                        if (window.isFirebaseActive && window.db) {
+                            for (const n of window.notes) {
+                                await setDoc(doc(window.db, "notes", n.id), n);
+                            }
+                        } else {
+                            saveLocalNotes();
+                        }
+                        renderAll();
+                        alert("データを取り込みました。");
+                    }
+                } catch(err) {
+                    alert("JSONファイルの読み込みに失敗しました。");
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        // Modals & UI Helpers
+        window.openFirebaseModal = function() {
+            const savedCfg = localStorage.getItem('med_obsidian_firebase_cfg');
+            if (savedCfg) {
+                try {
+                    const cfg = JSON.parse(savedCfg);
+                    document.getElementById('cfgApiKey').value = cfg.apiKey || '';
+                    document.getElementById('cfgAuthDomain').value = cfg.authDomain || '';
+                    document.getElementById('cfgProjectId').value = cfg.projectId || '';
+                    document.getElementById('cfgStorageBucket').value = cfg.storageBucket || '';
+                    document.getElementById('cfgMessagingSenderId').value = cfg.messagingSenderId || '';
+                    document.getElementById('cfgAppId').value = cfg.appId || '';
+                } catch(e){}
+            }
+            document.getElementById('firebaseModal').classList.remove('hidden');
+        };
+
+        window.closeFirebaseModal = function() {
+            document.getElementById('firebaseModal').classList.add('hidden');
+        };
+
+        // Utility: Escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function formatDate(isoStr) {
+            if (!isoStr) return '-';
+            const d = new Date(isoStr);
+            return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+
+        // ----------------------------------------------------
+        // INTERACTIVE 2D KNOWLEDGE GRAPH VISUALIZER
+        // ----------------------------------------------------
+        let graphAnimFrame = null;
+        let graphNodes = [];
+        let graphLinks = [];
+
+        window.toggleGraphModal = function() {
+            const modal = document.getElementById('graphModal');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                initGraphCanvas();
+            } else {
+                modal.classList.add('hidden');
+                if (graphAnimFrame) cancelAnimationFrame(graphAnimFrame);
+            }
+        };
+
+        function initGraphCanvas() {
+            const canvas = document.getElementById('graphCanvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+
+            // Build Nodes & Links
+            graphNodes = window.notes.map((n, idx) => ({
+                id: n.id,
+                title: n.title,
+                x: Math.random() * (canvas.width - 200) + 100,
+                y: Math.random() * (canvas.height - 200) + 100,
+                vx: 0,
+                vy: 0,
+                radius: 12
+            }));
+
+            graphLinks = [];
+            const wikiRegex = /\[\[(.*?)\]\]/g;
+
+            window.notes.forEach(sourceNote => {
+                let match;
+                while ((match = wikiRegex.exec(sourceNote.content)) !== null) {
+                    const targetTitle = match[1].trim();
+                    const targetNode = graphNodes.find(gn => gn.title.toLowerCase() === targetTitle.toLowerCase());
+                    const sourceNode = graphNodes.find(gn => gn.id === sourceNote.id);
+
+                    if (sourceNode && targetNode) {
+                        graphLinks.push({ source: sourceNode, target: targetNode });
+                    }
+                }
+            });
+
+            // Dragging state
+            let draggedNode = null;
+            canvas.onmousedown = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                draggedNode = graphNodes.find(n => Math.hypot(n.x - mx, n.y - my) < n.radius * 1.5);
+            };
+            canvas.onmousemove = (e) => {
+                if (draggedNode) {
+                    const rect = canvas.getBoundingClientRect();
+                    draggedNode.x = e.clientX - rect.left;
+                    draggedNode.y = e.clientY - rect.top;
+                }
+            };
+            canvas.onmouseup = (e) => {
+                if (draggedNode) {
+                    const rect = canvas.getBoundingClientRect();
+                    const mx = e.clientX - rect.left;
+                    const my = e.clientY - rect.top;
+                    selectNote(draggedNode.id);
+                    toggleGraphModal();
+                }
+                draggedNode = null;
+            };
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Simple Spring Physics
+                graphLinks.forEach(link => {
+                    const dx = link.target.x - link.source.x;
+                    const dy = link.target.y - link.source.y;
+                    const dist = Math.hypot(dx, dy) || 1;
+                    const force = (dist - 120) * 0.005;
+
+                    const fx = (dx / dist) * force;
+                    const fy = (dy / dist) * force;
+
+                    link.source.vx += fx;
+                    link.source.vy += fy;
+                    link.target.vx -= fx;
+                    link.target.vy -= fy;
+                });
+
+                graphNodes.forEach(n => {
+                    n.x += n.vx;
+                    n.y += n.vy;
+                    n.vx *= 0.85;
+                    n.vy *= 0.85;
+
+                    // Bounds
+                    n.x = Math.max(30, Math.min(canvas.width - 30, n.x));
+                    n.y = Math.max(30, Math.min(canvas.height - 30, n.y));
+                });
+
+                // Render Links
+                ctx.strokeStyle = '#0d9488';
+                ctx.lineWidth = 1.5;
+                graphLinks.forEach(link => {
+                    ctx.beginPath();
+                    ctx.moveTo(link.source.x, link.source.y);
+                    ctx.lineTo(link.target.x, link.target.y);
+                    ctx.stroke();
+                });
+
+                // Render Nodes
+                graphNodes.forEach(n => {
+                    const isSelected = n.id === window.currentNoteId;
+
+                    ctx.beginPath();
+                    ctx.arc(n.x, n.y, isSelected ? 14 : 10, 0, Math.PI * 2);
+                    ctx.fillStyle = isSelected ? '#06b6d4' : '#14b8a6';
+                    ctx.shadowColor = isSelected ? '#06b6d4' : 'transparent';
+                    ctx.shadowBlur = isSelected ? 15 : 0;
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // Labels
+                    ctx.fillStyle = '#fffffe';
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(n.title, n.x, n.y + 22);
+                });
+
+                graphAnimFrame = requestAnimationFrame(animate);
+            }
+
+            animate();
+        }
+    </script>
+</body>
+</html>
